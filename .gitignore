@@ -1,0 +1,8 @@
+.env
+.DS_Store
+
+
+# Local secrets and IDE metadata
+.secrets/
+**/.idea/
+**/src/main/resources/keys/

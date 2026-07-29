@@ -1,0 +1,163 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: Unread_Isle
+
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:unread_isle}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${MYSQL_USERNAME:unread_isle}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: com.tongji
+
+  elasticsearch:
+    uris:
+      - ${ELASTICSEARCH_URIS:http://127.0.0.1:9200}
+    username: ${ELASTICSEARCH_USERNAME:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+
+  ai:
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${DEEPSEEK_CHAT_MODEL:deepseek-chat}
+          temperature: 0.2
+
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      embedding:
+        options:
+          model: ${EMBEDDING_MODEL:text-embedding-3-small}
+
+    vectorstore:
+      elasticsearch:
+        initialize-schema: true
+        index-name: ${ES_VECTOR_INDEX:unread_isle_ai_index}
+        dimensions: ${EMBEDDING_DIMENSIONS:1536}
+        similarity: cosine
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+mybatis:
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+auth:
+  jwt:
+    issuer: ${JWT_ISSUER:Unread_Isle}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:7d}
+    key-id: ${JWT_KEY_ID:unread_isle-local-key}
+    private-key: ${JWT_PRIVATE_KEY:file:./.secrets/jwt/private.pem}
+    public-key: ${JWT_PUBLIC_KEY:file:./.secrets/jwt/public.pem}
+  verification:
+    code-length: 6
+    ttl: 5m
+    max-attempts: 5
+    send-interval: 60s
+    daily-limit: 10
+  password:
+    bcrypt-strength: 12
+    min-length: 8
+
+oss:
+  endpoint: ${OSS_ENDPOINT}
+  access-key-id: ${OSS_ACCESS_KEY_ID}
+  access-key-secret: ${OSS_ACCESS_KEY_SECRET}
+  bucket: ${OSS_BUCKET}
+  public-domain: ${OSS_PUBLIC_DOMAIN:}
+  folder: ${OSS_FOLDER:avatars}
+
+canal:
+  enabled: ${CANAL_ENABLED:true}
+  host: ${CANAL_HOST:127.0.0.1}
+  port: ${CANAL_PORT:11111}
+  destination: ${CANAL_DESTINATION:example}
+  username: ${CANAL_USERNAME:}
+  password: ${CANAL_PASSWORD:}
+  filter: ${CANAL_FILTER:unread_isle.outbox}
+  batchSize: ${CANAL_BATCH_SIZE:100}
+  intervalMs: ${CANAL_INTERVAL_MS:1000}
+
+counter:
+  rebuild:
+    enabled: false
+    lock:
+      ttl-ms: 5000
+      watchdog-ms: 30000
+    rate:
+      permits: 3
+      window-seconds: 10
+    backoff:
+      base-ms: 500
+      max-ms: 30000
+
+cache:
+  l2:
+    public-cfg:
+      ttl-seconds: 15
+      max-size: 1000
+    mine-cfg:
+      ttl-seconds: 10
+      max-size: 1000
+    detail-cfg:
+      ttl-seconds: 30
+      max-size: 5000
+  hotkey:
+    window-seconds: 60
+    segment-seconds: 10
+    level-low: 50
+    level-medium: 200
+    level-high: 500
+    extend-low-seconds: 20
+    extend-medium-seconds: 60
+    extend-high-seconds: 120
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.tongji: INFO
+
