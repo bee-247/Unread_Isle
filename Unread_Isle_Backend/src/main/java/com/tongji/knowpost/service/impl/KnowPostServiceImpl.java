@@ -3,6 +3,7 @@ package com.tongji.knowpost.service.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.tongji.counter.service.UserCounterService;
 import com.tongji.knowpost.service.KnowPostService;
+import com.tongji.knowpost.service.KnowPostFeedService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.common.exception.BusinessException;
@@ -14,6 +15,7 @@ import com.tongji.knowpost.model.KnowPostDetailRow;
 import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.tongji.counter.service.CounterService;
+import com.tongji.storage.OssStorageService;
 import com.tongji.storage.config.OssProperties;
 import com.tongji.llm.rag.RagIndexService;
 import com.tongji.relation.outbox.OutboxMapper;
@@ -25,6 +27,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -42,6 +46,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final SnowflakeIdGenerator idGen;
     private final ObjectMapper objectMapper;
     private final OssProperties ossProperties;
+    private final OssStorageService ossStorageService;
     private final CounterService counterService;
     private final UserCounterService userCounterService;
     private final StringRedisTemplate redis;
@@ -53,6 +58,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final ConcurrentHashMap<String, Object> singleFlight = new ConcurrentHashMap<>();
     private final RagIndexService ragIndexService;
     private final OutboxMapper outboxMapper;
+    private final KnowPostFeedService knowPostFeedService;
 
     // 手动编写构造器，Spring的@Qualifier直接标注在参数上（核心）
     public KnowPostServiceImpl(
@@ -60,18 +66,21 @@ public class KnowPostServiceImpl implements KnowPostService {
             SnowflakeIdGenerator idGen,
             ObjectMapper objectMapper,
             OssProperties ossProperties,
+            OssStorageService ossStorageService,
             CounterService counterService,
             UserCounterService userCounterService,
             StringRedisTemplate redis,
             @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache,
             HotKeyDetector hotKey,
             RagIndexService ragIndexService,
-            OutboxMapper outboxMapper
+            OutboxMapper outboxMapper,
+            KnowPostFeedService knowPostFeedService
     ) {
         this.mapper = mapper;
         this.idGen = idGen;
         this.objectMapper = objectMapper;
         this.ossProperties = ossProperties;
+        this.ossStorageService = ossStorageService;
         this.counterService = counterService;
         this.userCounterService = userCounterService;
         this.redis = redis;
@@ -79,6 +88,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         this.hotKey = hotKey;
         this.ragIndexService = ragIndexService;
         this.outboxMapper = outboxMapper;
+        this.knowPostFeedService = knowPostFeedService;
     }
     /**
      * 创建草稿并返回新 ID。
@@ -202,6 +212,31 @@ public class KnowPostServiceImpl implements KnowPostService {
             ragIndexService.ensureIndexed(id);
         } catch (Exception e) {
             log.warn("Pre-index after publish failed, post {}: {}", id, e.getMessage());
+        }
+
+        invalidateFeedAfterCommit(creatorId);
+    }
+
+    private void invalidateFeedAfterCommit(long creatorId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            invalidateFeedSafely(creatorId);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                invalidateFeedSafely(creatorId);
+            }
+        });
+    }
+
+    private void invalidateFeedSafely(long creatorId) {
+        try {
+            knowPostFeedService.invalidateFeedCaches(creatorId);
+        } catch (Exception e) {
+            // 发布事务已经成功提交，缓存服务异常不应把成功响应变成失败。
+            log.warn("Feed cache invalidation after publish failed, user {}: {}", creatorId, e.getMessage());
         }
     }
 
@@ -501,16 +536,23 @@ public class KnowPostServiceImpl implements KnowPostService {
         Boolean liked = uid != null && counterService.isLiked("knowpost", base.id(), uid);
         Boolean faved = uid != null && counterService.isFaved("knowpost", base.id(), uid);
 
+        // Bucket 保持私有：每次响应生成新的短期 GET 签名，稳定 URL 仍留在缓存和数据库中。
+        String readableContentUrl = ossStorageService.generateReadableUrl(base.contentUrl(), 900);
+        List<String> readableImages = base.images() == null
+                ? Collections.emptyList()
+                : base.images().stream().map(url -> ossStorageService.generateReadableUrl(url, 900)).toList();
+        String readableAuthorAvatar = ossStorageService.generateReadableUrl(base.authorAvatar(), 900);
+
         // 3. 构造新的 Record 对象返回
         return new KnowPostDetailResponse(
                 base.id(),
                 base.title(),
                 base.description(),
-                base.contentUrl(),
-                base.images(),
+                readableContentUrl,
+                readableImages,
                 base.tags(),
                 base.authorId(),
-                base.authorAvatar(),
+                readableAuthorAvatar,
                 base.authorNickname(),
                 base.authorTagJson(),
                 likeCount,

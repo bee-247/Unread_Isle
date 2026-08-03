@@ -8,6 +8,7 @@ import com.tongji.knowpost.api.dto.FeedPageResponse;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPostFeedRow;
 import com.tongji.counter.service.CounterService;
+import com.tongji.storage.OssStorageService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.tongji.cache.hotkey.HotKeyDetector;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,10 +29,13 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 public class KnowPostFeedServiceImpl implements KnowPostFeedService {
 
+    private static final String PUBLIC_FEED_VERSION_KEY = "feed:public:version";
+
     private final KnowPostMapper mapper;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final CounterService counterService;
+    private final OssStorageService ossStorageService;
     private final Cache<String, FeedPageResponse> feedPublicCache;
     private final Cache<String, FeedPageResponse> feedMineCache;
     private final HotKeyDetector hotKey;
@@ -55,6 +59,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             StringRedisTemplate redis,
             ObjectMapper objectMapper,
             CounterService counterService,
+            OssStorageService ossStorageService,
             @Qualifier("feedPublicCache") Cache<String, FeedPageResponse> feedPublicCache,
             @Qualifier("feedMineCache") Cache<String, FeedPageResponse> feedMineCache,
             HotKeyDetector hotKey
@@ -63,6 +68,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         this.redis = redis;
         this.objectMapper = objectMapper;
         this.counterService = counterService;
+        this.ossStorageService = ossStorageService;
         this.feedPublicCache = feedPublicCache;
         this.feedMineCache = feedMineCache;
         this.hotKey = hotKey;
@@ -78,6 +84,22 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         return "feed:public:" + size + ":" + page + ":v" + LAYOUT_VER;
     }
 
+    private String cacheVersion(String key) {
+        String version = redis.opsForValue().get(key);
+        return version == null ? "0" : version;
+    }
+
+    @Override
+    public void invalidateFeedCaches(long userId) {
+        redis.opsForValue().increment(PUBLIC_FEED_VERSION_KEY);
+        redis.opsForValue().increment("feed:mine:version:" + userId);
+
+        // Redis 的旧版本键依靠短 TTL 自动回收；本地缓存需要立即清空。
+        feedPublicCache.invalidateAll();
+        feedMineCache.invalidateAll();
+        log.info("feed cache version advanced after content change, user={}", userId);
+    }
+
     /**
      * 获取公开的首页 Feed（按发布时间倒序，不受置顶影响）。
      * 采用三级缓存：本地 Caffeine、Redis 页面缓存、Redis 片段缓存（ids/item/count）。
@@ -90,12 +112,13 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         int safeSize = Math.min(Math.max(size, 1), 50);
         int safePage = Math.max(page, 1);
         // 这个 localPageKey 是本地缓存的页面 Key（非 Redis）
-        String localPageKey = cacheKey(safePage, safeSize);
+        String feedVersion = cacheVersion(PUBLIC_FEED_VERSION_KEY);
+        String localPageKey = cacheKey(safePage, safeSize) + ":g" + feedVersion;
 
         // 按小时分片的片段缓存键：降低跨小时内容更新导致的大面积失效风险
         // 将分页维度（size/page）与时间维度（hourSlot）组合，避免热门页在整站失效时同时回源
         long hourSlot = System.currentTimeMillis() / 3600000L;
-        String idsKey = "feed:public:ids:" + safeSize + ":" + hourSlot + ":" + safePage;
+        String idsKey = "feed:public:ids:" + safeSize + ":" + hourSlot + ":" + safePage + ":g" + feedVersion;
         String hasMoreKey = "feed:public:ids:" + safeSize + ":" + hourSlot + ":" + safePage + ":hasMore";
 
         // L1: 先从本地缓存拿数据，高并发时抗 80% 流量
@@ -217,9 +240,9 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                     it.id(),
                     it.title(),
                     it.description(),
-                    it.coverImage(),
+                    ossStorageService.generateReadableUrl(it.coverImage(), 900),
                     it.tags(),
-                    it.authorAvatar(),
+                    ossStorageService.generateReadableUrl(it.authorAvatar(), 900),
                     it.authorNickname(),
                     it.tagJson(),
                     it.likeCount(),
@@ -296,9 +319,9 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                     base.id(),
                     base.title(),
                     base.description(),
-                    base.coverImage(),
+                    ossStorageService.generateReadableUrl(base.coverImage(), 900),
                     base.tags(),
-                    base.authorAvatar(),
+                    ossStorageService.generateReadableUrl(base.authorAvatar(), 900),
                     base.authorNickname(),
                     base.tagJson(),
                     likeCount,
@@ -388,14 +411,15 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     public FeedPageResponse getMyPublished(long userId, int page, int size) {
         int safeSize = Math.min(Math.max(size, 1), 50);
         int safePage = Math.max(page, 1);
-        String key = myCacheKey(userId, safePage, safeSize);
+        String mineVersion = cacheVersion("feed:mine:version:" + userId);
+        String key = myCacheKey(userId, safePage, safeSize) + ":g" + mineVersion;
 
         FeedPageResponse local = feedMineCache.getIfPresent(key);
         if (local != null) {
             hotKey.record(key);
             maybeExtendTtlMine(key);
             log.info("feed.mine source=local key={} page={} size={} user={}", key, safePage, safeSize, userId);
-            return local;
+            return new FeedPageResponse(enrich(local.items(), userId), local.page(), local.size(), local.hasMore());
         }
 
         String cached = redis.opsForValue().get(key);
@@ -433,7 +457,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             hotKey.record(key);
         } catch (Exception ignored) {}
         log.info("feed.mine source=db key={} page={} size={} user={} hasMore={}", key, safePage, safeSize, userId, hasMore);
-        return resp;
+        return new FeedPageResponse(enrich(items, userId), safePage, safeSize, hasMore);
     }
 
     /**

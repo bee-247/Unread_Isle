@@ -4,12 +4,14 @@ import SectionHeader from "@/components/common/SectionHeader";
 import TagInput from "@/components/common/TagInput";
 import Select from "@/components/common/Select";
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { knowpostService, uploadToPresigned, computeSha256 } from "@/services/knowpostService";
 import AuthStatus from "@/features/auth/AuthStatus";
 import { useAuth } from "@/context/AuthContext";
 import styles from "./CreatePage.module.css";
 
 const CreatePage = () => {
+  const navigate = useNavigate();
   const { user, tokens } = useAuth();
   const [type, setType] = useState("图文");
   const [tags, setTags] = useState<string[]>([]);
@@ -134,7 +136,7 @@ const CreatePage = () => {
 
       // 5) 发布
       await knowpostService.publish(id);
-      setMessage("发布成功 ✅");
+      navigate(`/post/${id}`, { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "发布失败";
       setError(msg);

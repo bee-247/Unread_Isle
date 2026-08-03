@@ -6,6 +6,7 @@ import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -26,6 +27,9 @@ public class RagQueryService {
     private final ChatClient chatClient;
     // 索引服务：确保帖子在问答前已建立/更新索引
     private final RagIndexService indexService;
+
+    @Value("${spring.ai.deepseek.chat.options.model}")
+    private String chatModelName;
 
     /**
      * 使用 WebFlux 返回回答内容的流。
@@ -49,7 +53,7 @@ public class RagQueryService {
                 .system(system)
                 .user(user)
                 .options(DeepSeekChatOptions.builder()
-                        .model("deepseek-chat") // 指定 DeepSeek 模型
+                        .model(chatModelName)    // 使用环境配置的兼容模型
                         .temperature(0.2)       // 低温度：更稳健、少发散
                         .maxTokens(maxTokens)    // 控制最大输出长度
                         .build())

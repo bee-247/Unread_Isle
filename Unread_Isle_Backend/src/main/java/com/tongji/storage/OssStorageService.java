@@ -14,7 +14,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.net.URI;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Service
@@ -77,6 +80,49 @@ public class OssStorageService {
             return url.toString();
         } finally {
             client.shutdown();
+        }
+    }
+
+    /**
+     * 将数据库中保存的稳定 OSS 地址转换为短期可读地址。
+     * 非当前 Bucket 的地址（例如 CDN 或外部图片）保持不变。
+     */
+    public String generateReadableUrl(String storedUrl, int expiresInSeconds) {
+        if (storedUrl == null || storedUrl.isBlank()) {
+            return storedUrl;
+        }
+
+        String objectKey = extractObjectKey(storedUrl);
+        if (objectKey == null) {
+            return storedUrl;
+        }
+
+        ensureConfigured();
+        OSS client = new OSSClientBuilder().build(props.getEndpoint(), props.getAccessKeyId(), props.getAccessKeySecret());
+        try {
+            Date expiration = new Date(System.currentTimeMillis() + expiresInSeconds * 1000L);
+            GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(props.getBucket(), objectKey, HttpMethod.GET);
+            request.setExpiration(expiration);
+            return client.generatePresignedUrl(request).toString();
+        } finally {
+            client.shutdown();
+        }
+    }
+
+    private String extractObjectKey(String storedUrl) {
+        try {
+            URI uri = URI.create(storedUrl);
+            String expectedHost = props.getBucket() + "." + props.getEndpoint();
+            if (uri.getHost() == null || !uri.getHost().equalsIgnoreCase(expectedHost)) {
+                return null;
+            }
+            String path = uri.getRawPath();
+            if (path == null || path.length() <= 1) {
+                return null;
+            }
+            return URLDecoder.decode(path.substring(1), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 

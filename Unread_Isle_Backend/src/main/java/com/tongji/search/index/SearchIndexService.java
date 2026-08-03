@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.counter.service.CounterService;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPostDetailRow;
+import com.tongji.storage.OssStorageService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,7 @@ public class SearchIndexService {
     private final KnowPostMapper knowPostMapper;
     private final CounterService counterService;
     private final ObjectMapper objectMapper;
+    private final OssStorageService ossStorageService;
     private final RestTemplate http = new RestTemplate();
 
     /**
@@ -103,7 +105,7 @@ public class SearchIndexService {
             }
 
             // 正文优先拉取 contentUrl，失败则使用描述
-            String body = fetchContentSafe(row.getContentUrl());
+            String body = fetchContentSafe(ossStorageService.generateReadableUrl(row.getContentUrl(), 300));
             if (body == null || body.isBlank()) {
                 body = row.getDescription();
             }

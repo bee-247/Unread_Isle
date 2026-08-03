@@ -6,6 +6,7 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPostDetailRow;
 import com.tongji.config.EsProperties;
+import com.tongji.storage.OssStorageService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,7 @@ public class RagIndexService {
     private final ElasticsearchClient es;
     // ES 相关配置（索引名等）
     private final EsProperties esProps;
+    private final OssStorageService ossStorageService;
 
     public void ensureIndexed(long postId) {
         // 当前策略：在问答前直接尝试重建（指纹未变化时会跳过）
@@ -71,7 +73,7 @@ public class RagIndexService {
         }
 
         // 抓取 Markdown 正文
-        String text = fetchContent(row.getContentUrl());
+        String text = fetchContent(ossStorageService.generateReadableUrl(row.getContentUrl(), 300));
         if (!StringUtils.hasText(text)) {
             log.warn("Post {} content empty", postId);
             return 0;

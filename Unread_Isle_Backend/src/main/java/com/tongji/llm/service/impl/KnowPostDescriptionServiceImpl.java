@@ -6,6 +6,7 @@ import com.tongji.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
@@ -15,6 +16,9 @@ import java.text.Normalizer;
 public class KnowPostDescriptionServiceImpl implements KnowPostDescriptionService {
 
     private final ChatClient chatClient;
+
+    @Value("${spring.ai.deepseek.chat.options.model}")
+    private String chatModelName;
 
     /**
      * 基于正文生成不超过 50 字的中文描述。
@@ -32,7 +36,7 @@ public class KnowPostDescriptionServiceImpl implements KnowPostDescriptionServic
                     .system(system)
                     .user(user)
                     .options(DeepSeekChatOptions.builder()
-                            .model("deepseek-chat")
+                            .model(chatModelName)
                             .temperature(0.8)
                             .maxTokens(120)
                             .build())

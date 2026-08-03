@@ -15,6 +15,7 @@ import com.tongji.counter.service.CounterService;
 import com.tongji.search.api.dto.SearchResponse;
 import com.tongji.search.api.dto.SuggestResponse;
 import com.tongji.search.service.SearchService;
+import com.tongji.storage.OssStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +38,7 @@ public class SearchServiceImpl implements SearchService {
 
     private final ElasticsearchClient es;
     private final CounterService counterService;
+    private final OssStorageService ossStorageService;
     /**
      * ES 索引名：unread_isle 内容统一索引。
      */
@@ -131,9 +133,9 @@ public class SearchServiceImpl implements SearchService {
                     id,
                     title,
                     description,
-                    cover,
+                    ossStorageService.generateReadableUrl(cover, 900),
                     tagList,
-                    authorAvatar,
+                    ossStorageService.generateReadableUrl(authorAvatar, 900),
                     authorNickname,
                     tagJson,
                     likeCount,

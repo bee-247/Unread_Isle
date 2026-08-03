@@ -1,243 +1,105 @@
-# 未读岛（Unread_Isle）
+# 未读岛（Unread Isle）
 
-未读岛是一个知识获取与分享社区，支持发布“知文”、首页 Feed、搜索、点赞收藏、关注关系、个人主页，以及 AI 摘要和基于单篇知文的 RAG 问答。
+未读岛是一个面向知识创作、发现与交流的社区项目。用户可以发布“知文”，通过首页 Feed 和搜索发现内容，并使用点赞、收藏、关注及 AI 问答等功能完成从阅读到沉淀的完整流程。
 
-## 技术栈
+项目采用前后端分离架构，并通过 Docker Compose 编排应用与基础设施，适合本地开发、功能演示和二次开发。
 
-### 后端
+## 核心功能
 
-- Java 21、Spring Boot、Spring Security
-- MyBatis、MySQL
-- Redis、Redisson、Caffeine
-- Kafka、Canal
-- Elasticsearch
-- Spring AI、DeepSeek
-- 阿里云 OSS
+- 用户注册、登录和 JWT 双令牌认证
+- 知文草稿、Markdown 正文、图片上传与发布
+- 首页 Feed、个人主页和内容详情页
+- 点赞、收藏、关注、粉丝与用户计数
+- Elasticsearch 全文搜索与内容索引
+- AI 自动摘要和基于单篇知文的 RAG 流式问答
+- 阿里云 OSS 文件直传与私有资源临时签名读取
+- Redis、Caffeine 多级缓存及发布后 Feed 实时失效
+- Kafka、Canal 与 Outbox 驱动的异步数据同步
+
+## 技术架构
 
 ### 前端
 
 - React 18
 - TypeScript
 - Vite
+- React Router
+- React Markdown
+- Nginx
+
+### 后端
+
+- Java 21
+- Spring Boot 3
+- Spring Security、JWT
+- Spring AI
+- MyBatis
+- MySQL
+- Redis、Redisson、Caffeine
+- Kafka、Canal
+- Elasticsearch
+- 阿里云 OSS
+
+### 服务关系
+
+```text
+浏览器
+  └── Frontend / Nginx :8088
+        └── Backend / Spring Boot :8080
+              ├── MySQL
+              ├── Redis
+              ├── Kafka + Canal
+              ├── Elasticsearch
+              ├── 阿里云 OSS
+              └── AI 模型服务
+```
 
 ## 项目结构
 
 ```text
 Unread_Isle/
-├── docker-compose.yml                # 前端、后端及基础服务编排
-├── .env.example                      # 环境变量模板
-├── Unread_Isle_Backend/                 # Spring Boot 后端
-│   ├── db/schema.sql                 # 数据库结构
-│   └── src/main/resources/
-│       └── application-local.yml     # 本地环境配置
-└── Unread_Isle_Frontend/                # React 前端
+├── docker-compose.yml                 # 全部服务的 Docker Compose 编排
+├── README.md                          # 项目说明
+├── Unread_Isle_Backend/               # Spring Boot 后端
+│   ├── db/schema.sql                  # 数据库初始化脚本
+│   ├── Dockerfile
+│   ├── pom.xml
+│   └── src/
+└── Unread_Isle_Frontend/              # React 前端
+    ├── Dockerfile
+    ├── nginx.conf
+    ├── package.json
+    └── src/
 ```
-
-## 主要功能
-
-- 手机号或邮箱注册、登录及 JWT 双令牌认证
-- 知文草稿、OSS 直传、发布、编辑和删除
-- 首页 Feed 与多级缓存
-- 点赞、收藏及高并发计数
-- 关注、取关、关注列表和粉丝列表
-- Elasticsearch 内容搜索与联想
-- DeepSeek 自动生成摘要
-- 基于 Elasticsearch 向量库的单篇知文 RAG 问答
 
 ## 一键启动项目
 
-### 1. 环境要求
+请先安装并启动 Docker Desktop，然后进入项目根目录执行以下命令。
 
-一键启动只需要安装 Docker Desktop。只有使用下文的开发模式时，才需要在
-宿主机额外安装 JDK 21、Maven 3.9+、Node.js 20+ 和 npm。
+### 启动
 
-检查环境：
-
-```bash
-docker version
-docker compose version
-```
-
-### 2. 配置环境变量
-
-在项目根目录复制环境变量模板：
-
-```bash
-cp .env.example .env
-```
-
-生成只保存在本机的 JWT 密钥：
-
-```bash
-mkdir -p .secrets/jwt
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
-  -out .secrets/jwt/private.pem
-openssl pkey -in .secrets/jwt/private.pem -pubout \
-  -out .secrets/jwt/public.pem
-```
-
-编辑 `.env`，搜索 `CHANGE_ME`，填写以下参数：
-
-```dotenv
-# MySQL 和 Redis
-MYSQL_PASSWORD=...
-MYSQL_ROOT_PASSWORD=...
-REDIS_PASSWORD=...
-
-# AI
-DEEPSEEK_API_KEY=...
-OPENAI_API_KEY=...
-
-# 阿里云 OSS
-OSS_ENDPOINT=...
-OSS_ACCESS_KEY_ID=...
-OSS_ACCESS_KEY_SECRET=...
-OSS_BUCKET=...
-```
-
-默认使用 OpenAI Embedding。如果使用其他兼容服务，还需要修改：
-
-```dotenv
-OPENAI_BASE_URL=...
-EMBEDDING_MODEL=...
-EMBEDDING_DIMENSIONS=...
-```
-
-`EMBEDDING_DIMENSIONS` 必须与所选模型的实际向量维度一致。
-
-`.env` 包含敏感信息，已经加入 `.gitignore`，请勿提交。
-
-### 3. 启动完整项目
-
-在项目根目录运行：
+在后台构建并启动前端、后端及全部基础服务：
 
 ```bash
 docker compose --env-file .env up -d --build
 ```
 
-该命令会启动：
+启动完成后访问 <http://localhost:8088>。
 
-- React 前端（Nginx）
-- Spring Boot 后端
-- MySQL
-- Redis
-- Kafka
-- Elasticsearch
-- Canal
+### 关闭
 
-查看状态：
+停止并删除项目容器和网络，同时保留数据库等持久化数据：
 
 ```bash
-docker compose --env-file .env ps
+docker compose --env-file .env down
 ```
 
-启动完成后访问：
-
-```text
-http://localhost:8088
-```
-
-前端 Nginx 会自动把 `/api` 请求转发到后端，通常不需要直接访问
-后端的 `8080` 端口。
-
-首次创建 MySQL 数据卷时，Compose 会自动执行：
-
-```text
-Unread_Isle_Backend/db/schema.sql
-```
-
-如果服务启动失败，可以查看日志：
-
-```bash
-docker compose logs -f mysql
-docker compose logs -f redis
-docker compose logs -f kafka
-docker compose logs -f elasticsearch
-docker compose logs -f canal
-```
-
-## 开发模式
-
-一键 Docker 启动适合首次运行、联调和演示。需要前端热更新或后端调试时，
-可以只用 Docker 启动基础服务，再分别启动前后端。
-
-### 1. 只启动基础服务
-
-```bash
-docker compose --env-file .env up -d mysql redis kafka elasticsearch canal
-```
-
-### 2. 启动后端
-
-在项目根目录加载环境变量：
-
-```bash
-set -a
-source .env
-set +a
-```
-
-启动 Spring Boot：
-
-```bash
-mvn -f Unread_Isle_Backend/pom.xml spring-boot:run
-```
-
-`.env` 已设置 `SPRING_PROFILES_ACTIVE=local`，后端会读取：
-
-```text
-Unread_Isle_Backend/src/main/resources/application-local.yml
-```
-
-后端默认地址：
-
-```text
-http://localhost:8080
-```
-
-检查健康状态：
-
-```bash
-curl http://localhost:8080/actuator/health
-```
-
-### 3. 启动前端
-
-打开另一个终端：
-
-```bash
-cd Unread_Isle_Frontend
-npm ci
-npm run dev
-```
-
-访问：
-
-```text
-http://localhost:5173
-```
-
-开发环境中，Vite 会自动把 `/api` 请求代理到 `http://localhost:8080`。
-
-## 停止项目
-
-先停止前后端进程，再停止 Docker 服务：
-
-```bash
-docker compose down
-```
-
-如需同时删除 MySQL、Redis、Kafka 和 Elasticsearch 的本地数据：
-
-```bash
-docker compose down -v
-```
-
-> `docker compose down -v` 会永久删除本地服务数据，请谨慎使用。
+不要随意添加 `-v` 参数，否则会同时删除数据库及其他 Docker 数据卷。
 
 ## 注意事项
 
-- 项目中的 JWT 密钥仅供本地开发，生产环境请重新生成并使用密钥管理服务。
-- 本地 Canal 使用 MySQL root 账号读取 binlog，仅适合开发环境。
-- 搜索索引使用 `ik_max_word` 和 `ik_smart`，完整中文搜索需要为 Elasticsearch 安装版本匹配的 IK 分词插件。
-- AI 与 OSS 功能依赖有效的外部服务凭据。
+- `.env`、JWT 私钥及云服务密钥属于敏感信息，不应提交到 Git。
+- OSS Bucket 可以保持私有，后端会为允许访问的文件生成短期签名地址。
+- `docker compose down` 不会删除持久化数据；`docker compose down -v` 会删除。
+- Canal 使用 MySQL binlog 完成增量同步，当前 Compose 配置主要面向本地开发环境。
+- AI 摘要、Embedding、RAG 与 OSS 功能依赖对应外部服务可用。
