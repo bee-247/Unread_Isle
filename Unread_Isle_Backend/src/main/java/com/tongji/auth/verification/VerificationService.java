@@ -54,7 +54,12 @@ public class VerificationService {
 
         String code = generateNumericCode(cfg.getCodeLength());
         codeStore.saveCode(scene.name(), identifier, code, cfg.getTtl(), cfg.getMaxAttempts());
-        codeSender.sendCode(scene, identifier, code, (int) cfg.getTtl().toMinutes());
+        try {
+            codeSender.sendCode(scene, identifier, code, (int) cfg.getTtl().toMinutes());
+        } catch (RuntimeException ex) {
+            codeStore.invalidate(scene.name(), identifier);
+            throw ex;
+        }
         return new SendCodeResult(identifier, scene, (int) cfg.getTtl().toSeconds());
     }
 

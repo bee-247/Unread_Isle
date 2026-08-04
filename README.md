@@ -103,3 +103,22 @@ docker compose --env-file .env down
 - `docker compose down` 不会删除持久化数据；`docker compose down -v` 会删除。
 - Canal 使用 MySQL binlog 完成增量同步，当前 Compose 配置主要面向本地开发环境。
 - AI 摘要、Embedding、RAG 与 OSS 功能依赖对应外部服务可用。
+
+## 邮箱验证码配置
+
+注册和验证码登录使用“图形验证码 + 邮件验证码”。图形验证码存储在 Redis 中，默认 2 分钟过期；邮件验证码默认 5 分钟过期。
+
+本地未开启邮件发送时，验证码只会打印在后端日志中。要通过 SMTP 实际发送邮件，请在 `.env` 中配置：
+
+```dotenv
+MAIL_ENABLED=true
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=no-reply@example.com
+MAIL_PASSWORD=replace-with-smtp-password
+MAIL_FROM=no-reply@example.com
+MAIL_SMTP_AUTH=true
+MAIL_STARTTLS_ENABLE=true
+```
+
+不同邮件服务商的端口和加密方式可能不同，请以服务商提供的 SMTP 参数为准。不要把邮箱密码或 SMTP 授权码提交到 Git。

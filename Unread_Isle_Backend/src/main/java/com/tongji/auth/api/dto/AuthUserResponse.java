@@ -12,6 +12,7 @@ public record AuthUserResponse(
         String nickname,
         String avatar,
         String phone,
+        String email,
         String unreadIsleId,
         LocalDate birthday,
         String school,

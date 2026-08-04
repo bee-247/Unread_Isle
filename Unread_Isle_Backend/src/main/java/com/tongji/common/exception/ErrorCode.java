@@ -12,6 +12,10 @@ public enum ErrorCode {
     VERIFICATION_NOT_FOUND("VERIFICATION_NOT_FOUND", "验证码不存在或已过期"),
     VERIFICATION_MISMATCH("VERIFICATION_MISMATCH", "验证码错误"),
     VERIFICATION_TOO_MANY_ATTEMPTS("VERIFICATION_TOO_MANY_ATTEMPTS", "验证码尝试次数过多"),
+    CAPTCHA_NOT_FOUND("CAPTCHA_NOT_FOUND", "图形验证码不存在或已过期"),
+    CAPTCHA_MISMATCH("CAPTCHA_MISMATCH", "图形验证码错误"),
+    CAPTCHA_TOO_MANY_ATTEMPTS("CAPTCHA_TOO_MANY_ATTEMPTS", "图形验证码尝试次数过多，请更换图片"),
+    EMAIL_SEND_FAILED("EMAIL_SEND_FAILED", "邮件验证码发送失败，请稍后重试"),
     INVALID_CREDENTIALS("INVALID_CREDENTIALS", "登录凭证错误"),
     PASSWORD_POLICY_VIOLATION("PASSWORD_POLICY_VIOLATION", "密码强度不足"),
     TERMS_NOT_ACCEPTED("TERMS_NOT_ACCEPTED", "请先同意服务条款"),
@@ -27,4 +31,3 @@ public enum ErrorCode {
         this.defaultMessage = defaultMessage;
     }
 }
-

@@ -38,6 +38,16 @@
 
 ## 验证码与场景
 
+发送邮件验证码前，客户端需先调用 `GET /api/v1/auth/captcha` 获取图形验证码。响应中的 `imageData` 可直接作为 `<img>` 的 `src`；点击“换一张”时重新请求此接口即可。图形验证码校验成功后会被一次性消费。
+
+```json
+{
+  "captchaId": "0d3ea3d3-7187-4a38-8438-a47cf5dc1c26",
+  "imageData": "data:image/png;base64,iVBORw0KGgo...",
+  "expireSeconds": 120
+}
+```
+
 验证码场景枚举 `VerificationScene`：`REGISTER`（注册）、`LOGIN`（登录）、`RESET_PASSWORD`（重置密码）。
 
 Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
@@ -58,14 +68,16 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
   ```json
   {
     "scene": "REGISTER",            // REGISTER | LOGIN | RESET_PASSWORD
-    "identifierType": "PHONE",     // 根据项目实际支持的类型，如 PHONE/EMAIL/USERNAME
-    "identifier": "13800138000"
+    "identifierType": "EMAIL",
+    "identifier": "user@example.com",
+    "captchaId": "0d3ea3d3-7187-4a38-8438-a47cf5dc1c26",
+    "captchaAnswer": "A7K9"
   }
   ```
 - 成功响应：
   ```json
   {
-    "identifier": "13800138000",
+    "identifier": "user@example.com",
     "scene": "REGISTER",
     "expireSeconds": 300
   }
@@ -81,8 +93,10 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
     -H "Content-Type: application/json" \
     -d '{
       "scene": "REGISTER",
-      "identifierType": "PHONE",
-      "identifier": "13800138000"
+      "identifierType": "EMAIL",
+      "identifier": "user@example.com",
+      "captchaId": "0d3ea3d3-7187-4a38-8438-a47cf5dc1c26",
+      "captchaAnswer": "A7K9"
     }'
   ```
 
@@ -93,11 +107,11 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
 - 请求体：
   ```json
   {
-    "identifierType": "PHONE",
-    "identifier": "13800138000",
+    "identifierType": "EMAIL",
+    "identifier": "user@example.com",
     "code": "123456",
     "password": "StrongP@ssw0rd",
-    "nickname": "新用户"
+    "agreeTerms": true
   }
   ```
 - 成功响应：
@@ -117,8 +131,8 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
   curl -X POST http://localhost:8080/api/v1/auth/register \
     -H "Content-Type: application/json" \
     -d '{
-      "identifierType": "PHONE",
-      "identifier": "13800138000",
+      "identifierType": "EMAIL",
+      "identifier": "user@example.com",
       "code": "123456",
       "password": "StrongP@ssw0rd",
       "nickname": "新用户"
@@ -133,16 +147,16 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
   - 验证码登录示例：
     ```json
     {
-      "identifierType": "PHONE",
-      "identifier": "13800138000",
+      "identifierType": "EMAIL",
+      "identifier": "user@example.com",
       "code": "123456"
     }
     ```
   - 密码登录示例：
     ```json
     {
-      "identifierType": "USERNAME",
-      "identifier": "alice",
+      "identifierType": "EMAIL",
+      "identifier": "user@example.com",
       "password": "StrongP@ssw0rd"
     }
     ```
@@ -163,8 +177,8 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
   curl -X POST http://localhost:8080/api/v1/auth/login \
     -H "Content-Type: application/json" \
     -d '{
-      "identifierType": "PHONE",
-      "identifier": "13800138000",
+      "identifierType": "EMAIL",
+      "identifier": "user@example.com",
       "code": "123456"
     }'
   ```
@@ -228,8 +242,8 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
 - 请求体（`PasswordResetRequest`）：
   ```json
   {
-    "identifierType": "PHONE",
-    "identifier": "13800138000",
+    "identifierType": "EMAIL",
+    "identifier": "user@example.com",
     "code": "123456",
     "newPassword": "NewStr0ngP@ss"
   }
@@ -243,8 +257,8 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
   curl -X POST http://localhost:8080/api/v1/auth/password/reset \
     -H "Content-Type: application/json" \
     -d '{
-      "identifierType": "PHONE",
-      "identifier": "13800138000",
+      "identifierType": "EMAIL",
+      "identifier": "user@example.com",
       "code": "123456",
       "newPassword": "NewStr0ngP@ss"
     }'
@@ -277,8 +291,8 @@ Redis 存储键格式：`auth:code:{scene}:{identifier}`，哈希字段包括：
 
 - `SendCodeRequest`
   - `scene`：`REGISTER|LOGIN|RESET_PASSWORD`
-  - `identifierType`：如 `PHONE|EMAIL|USERNAME`
-  - `identifier`：标识值（手机号/邮箱/用户名）
+  - `identifierType`：如 `EMAIL`
+  - `identifier`：标识值（邮箱地址）
 
 - `SendCodeResponse`
   - `identifier`：同请求

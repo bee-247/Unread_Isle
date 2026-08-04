@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import type { LoginRequest } from "@/types/auth";
 import { authService } from "@/services/authService";
+import { useCaptcha } from "@/features/auth/useCaptcha";
 import styles from "./LoginPage.module.css";
 
 type LocationState = {
@@ -19,6 +20,16 @@ const LoginPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [message, setMessage] = useState<string | null>(null);
+  const {
+    captchaId,
+    captchaImage,
+    captchaAnswer,
+    setCaptchaAnswer,
+    captchaLoading,
+    captchaError,
+    refreshCaptcha
+  } = useCaptcha();
 
   const from = (location.state as LocationState | undefined)?.from ?? "/";
 
@@ -40,7 +51,7 @@ const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      const payload: LoginRequest = { identifierType: "PHONE", identifier, code };
+      const payload: LoginRequest = { identifierType: "EMAIL", identifier, code };
       await login(payload);
       navigate(from, { replace: true });
     } catch (err) {
@@ -53,23 +64,32 @@ const LoginPage = () => {
 
   const handleSendCode = async () => {
     if (!identifier) {
-      setError("请先填写账号信息");
+      setError("请先填写邮箱地址");
+      return;
+    }
+    if (!captchaId || !captchaAnswer) {
+      setError("请先填写图形验证码");
       return;
     }
     setError(null);
+    setMessage(null);
     setSendingCode(true);
     try {
       const response = await authService.sendCode({
         scene: "LOGIN",
-        identifierType: "PHONE",
-        identifier
+        identifierType: "EMAIL",
+        identifier,
+        captchaId,
+        captchaAnswer
       });
-      setCountdown(Math.max(1, response.expireSeconds ?? 300));
+      setCountdown(60);
+      setMessage(`邮件验证码已发送，${Math.ceil(response.expireSeconds / 60)} 分钟内有效`);
     } catch (err) {
       const info = err instanceof Error ? err.message : "验证码发送失败";
       setError(info);
     } finally {
       setSendingCode(false);
+      void refreshCaptcha().catch(() => undefined);
     }
   };
 
@@ -84,25 +104,60 @@ const LoginPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          {/* 只保留手机号 + 验证码登录，不提供选择 */}
+          {/* 邮箱 + 图形验证码 + 邮件验证码登录 */}
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="identifier">
-              手机号
+              邮箱
             </label>
             <input
               id="identifier"
               className={styles.input}
               value={identifier}
               onChange={event => setIdentifier(event.target.value)}
-              placeholder="请输入账号"
-              type="tel"
-              autoComplete="tel"
+              placeholder="请输入邮箱地址"
+              type="email"
+              autoComplete="email"
             />
           </div>
           <div className={styles.field}>
+            <label className={styles.label} htmlFor="captcha">图形验证码</label>
+            <div className={styles.captchaRow}>
+              <input
+                id="captcha"
+                className={styles.input}
+                value={captchaAnswer}
+                onChange={event => setCaptchaAnswer(event.target.value.toUpperCase())}
+                placeholder="请输入图中字符"
+                autoComplete="off"
+                maxLength={6}
+              />
+              <button
+                type="button"
+                className={styles.captchaButton}
+                onClick={() => void refreshCaptcha().catch(() => undefined)}
+                disabled={captchaLoading}
+                aria-label="换一张图形验证码"
+                title="点击换一张"
+              >
+                {captchaImage
+                  ? <img src={captchaImage} alt="图形验证码，点击更换" />
+                  : <span>{captchaLoading ? "加载中" : "点击刷新"}</span>}
+              </button>
+            </div>
+            <button
+              type="button"
+              className={styles.refreshCaptcha}
+              onClick={() => void refreshCaptcha().catch(() => undefined)}
+              disabled={captchaLoading}
+            >
+              看不清？换一张
+            </button>
+            {captchaError ? <span className={styles.captchaError}>{captchaError}</span> : null}
+          </div>
+          <div className={styles.field}>
             <label className={styles.label} htmlFor="code">
-              验证码
+              邮件验证码
             </label>
             <div className={styles.codeRow}>
               <input
@@ -110,7 +165,7 @@ const LoginPage = () => {
                 className={styles.input}
                 value={code}
                 onChange={event => setCode(event.target.value)}
-                placeholder="请输入验证码"
+                placeholder="请输入邮件验证码"
                 autoComplete="one-time-code"
               />
               <button
@@ -122,10 +177,11 @@ const LoginPage = () => {
                 {countdown > 0 ? `${countdown}s` : "获取验证码"}
               </button>
             </div>
-            <span className={styles.tips}>验证码用于校验登录，不需要输入密码。</span>
+            <span className={styles.tips}>邮件验证码用于校验登录，不需要输入密码。</span>
           </div>
 
           {error ? <div className={styles.error}>{error}</div> : null}
+          {message ? <div className={styles.success}>{message}</div> : null}
 
           <div className={styles.actions}>
             <button type="submit" className={styles.submitButton} disabled={isDisabled}>

@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/knowposts/*/qa/stream").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/send-code",
+                                "/api/v1/auth/captcha",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/token/refresh",

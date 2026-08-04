@@ -72,6 +72,24 @@ spring:
       max-file-size: 20MB
       max-request-size: 20MB
 
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_STARTTLS_ENABLE:false}
+          ssl:
+            enable: ${MAIL_SSL_ENABLE:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 mybatis:
   mapper-locations: classpath:/mapper/*.xml
   configuration:
@@ -91,6 +109,15 @@ auth:
     max-attempts: 5
     send-interval: 60s
     daily-limit: 10
+  captcha:
+    code-length: 4
+    ttl: 2m
+    max-attempts: 5
+    width: 132
+    height: 46
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:no-reply@unread-isle.local}
   password:
     bcrypt-strength: 12
     min-length: 8
@@ -160,4 +187,3 @@ management:
 logging:
   level:
     com.tongji: INFO
-

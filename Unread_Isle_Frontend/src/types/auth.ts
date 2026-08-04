@@ -1,4 +1,4 @@
-export type IdentifierType = "PHONE" | "EMAIL" | "USERNAME";
+export type IdentifierType = "PHONE" | "EMAIL";
 
 export type VerificationScene = "REGISTER" | "LOGIN" | "RESET_PASSWORD";
 
@@ -6,6 +6,14 @@ export type SendCodeRequest = {
   scene: VerificationScene;
   identifierType: IdentifierType;
   identifier: string;
+  captchaId: string;
+  captchaAnswer: string;
+};
+
+export type CaptchaResponse = {
+  captchaId: string;
+  imageData: string;
+  expireSeconds: number;
 };
 
 export type SendCodeResponse = {
@@ -29,8 +37,8 @@ export type AuthUserResponse = {
   id: number;
   nickname: string;
   avatar: string;
-  phone: string;
-  email?: string;
+  phone: string | null;
+  email: string | null;
   // 新增字段，与后端 auth/me 响应保持一致
   unreadIsleId?: string;
   birthday?: string; // LocalDate → 期望 yyyy-MM-dd 字符串

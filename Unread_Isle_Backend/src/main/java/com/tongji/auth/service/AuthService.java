@@ -27,6 +27,7 @@ import com.tongji.auth.verification.VerificationCheckResult;
 import com.tongji.auth.verification.VerificationCodeStatus;
 import com.tongji.auth.verification.VerificationScene;
 import com.tongji.auth.verification.VerificationService;
+import com.tongji.auth.captcha.CaptchaService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,7 @@ public class AuthService {
 
     private final UserService userService;
     private final VerificationService verificationService;
+    private final CaptchaService captchaService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenStore refreshTokenStore;
@@ -75,8 +77,12 @@ public class AuthService {
      * @throws BusinessException 当标识格式错误或存在性不符合场景要求时抛出。
      */
     public SendCodeResponse sendCode(SendCodeRequest request) {
+        if (request.identifierType() != IdentifierType.EMAIL) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "当前仅支持邮箱验证码");
+        }
         validateIdentifier(request.identifierType(), request.identifier());
         String normalized = normalizeIdentifier(request.identifierType(), request.identifier());
+        captchaService.verify(request.captchaId(), request.captchaAnswer());
         boolean exists = identifierExists(request.identifierType(), normalized);
         if (request.scene() == VerificationScene.REGISTER && exists) {
             throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS);
@@ -382,6 +388,7 @@ public class AuthService {
                 user.getNickname(),
                 user.getAvatar(),
                 user.getPhone(),
+                user.getEmail(),
                 user.getUnreadIsleId(),
                 user.getBirthday(),
                 user.getSchool(),

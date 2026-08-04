@@ -1,6 +1,7 @@
 import { apiFetch } from "./apiClient";
 import type {
   AuthenticatedUser,
+  CaptchaResponse,
   LoginRequest,
   LoginResponse,
   LogoutRequest,
@@ -14,6 +15,11 @@ import type {
 const AUTH_PREFIX = "/api/v1/auth";
 
 export const authService = {
+  getCaptcha: () =>
+    apiFetch<CaptchaResponse>(`${AUTH_PREFIX}/captcha`, {
+      accessToken: null
+    }),
+
   sendCode: (payload: SendCodeRequest) =>
     apiFetch<SendCodeResponse>(`${AUTH_PREFIX}/send-code`, {
       method: "POST",

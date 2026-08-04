@@ -22,6 +22,10 @@ public class AuthProperties {
     private final Jwt jwt = new Jwt();
     /** 验证码配置项。 */
     private final Verification verification = new Verification();
+    /** 图形验证码配置项。 */
+    private final Captcha captcha = new Captcha();
+    /** 邮件发送配置项。 */
+    private final Mail mail = new Mail();
     /** 密码策略配置项。 */
     private final Password password = new Password();
 
@@ -56,6 +60,23 @@ public class AuthProperties {
         private Duration sendInterval = Duration.ofSeconds(60);
         /** 同标识每日发送上限。 */
         private int dailyLimit = 10;
+    }
+
+    /** 图形验证码配置。 */
+    @Data
+    public static class Captcha {
+        private int codeLength = 4;
+        private Duration ttl = Duration.ofMinutes(2);
+        private int maxAttempts = 5;
+        private int width = 132;
+        private int height = 46;
+    }
+
+    /** 邮件验证码发送配置。 */
+    @Data
+    public static class Mail {
+        private boolean enabled = false;
+        private String from = "no-reply@unread-isle.local";
     }
 
     /** 密码策略配置。 */
